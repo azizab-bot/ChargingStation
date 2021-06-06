@@ -1,0 +1,122 @@
+//including libraries
+#include <Wire.h> 
+#include <LiquidCrystal_I2C.h>
+#include <Keypad.h>
+
+
+//initializing keypad
+const byte ROWS = 4; 
+const byte COLS = 4; 
+char hexaKeys[ROWS][COLS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+byte rowPins[ROWS] = {11, 10, 9, 8}; 
+byte colPins[COLS] = {7, 6, 5, 4}; 
+
+
+//initializing coin insertion machine
+const byte coinSig = A0;
+bool previousCoinSignal = false;
+const int coinValue = 5;
+int bankValue = 0;
+unsigned long previousUpdateMillis = 0;
+unsigned long updateInterval = 110;
+boolean printOnceFlag = false;
+int sec,i;
+
+//keypad object initialization
+Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS); 
+
+
+// LCD object initialization
+LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+
+//Initializing Relay Pin
+int relayPin = 12;
+
+void setup()
+{
+  Serial.begin(115200); // initialize serial monitor
+  pinMode(relayPin, OUTPUT); // initialize relayPin as output
+  digitalWrite(relayPin, HIGH);
+  lcd.init(); // initialize the lcd 
+  lcd.backlight(); // setup backlight
+  pinMode(coinSig, INPUT_PULLUP); // initialize coin signal as input
+  previousCoinSignal = digitalRead(coinSig);
+  lcd.setCursor(2,0);
+  lcd.print("Welcome to CS");
+  Serial.println("Welcome to CS");
+  lcd.setCursor(0,1);
+  lcd.print("Press 1 to Enter");
+  Serial.println("Press 1 to Enter");
+  
+}
+void printBank()
+{
+  lcd.setCursor(9,1);
+  lcd.print(bankValue);
+  Serial.print("Balance: ");
+  Serial.println(bankValue);
+}
+
+void loop()
+{
+ 
+  byte currentCoinSignal = digitalRead(coinSig);
+  char customKey = customKeypad.getKey();
+  switch (customKey) {
+    case '1': lcd.clear();
+              lcd.setCursor(1,0);
+              lcd.print("Insert Coin(s)");
+              lcd.setCursor(0,1);
+              lcd.print("Balance: ");
+              Serial.print("Balance: ");
+              lcd.print(bankValue);  
+              Serial.println(bankValue);      
+              break;
+    case '2': lcd.clear();
+              lcd.setCursor(1,0);
+              lcd.print("Charging...");
+              Serial.print("Charging...");
+              lcd.setCursor(0,1);
+              lcd.print("Time Left:  ");
+              sec = bankValue*60;
+                for(i=sec; i>=0; i--){
+                //lcd.setCursor(1,1);
+                //lcd.print("Time Left:  ");
+                lcd.setCursor(11,1);
+                lcd.print(i);
+                lcd.setCursor(15,1);
+                lcd.print("s");
+                digitalWrite(relayPin, LOW);
+                delay(1000);
+                Serial.print("Time left: ");
+                Serial.println(i);
+              }   
+              digitalWrite(relayPin, HIGH);
+              setup();       
+              break;
+  }
+   if (currentCoinSignal == LOW) 
+  {
+      previousUpdateMillis = millis();
+      printOnceFlag = true;
+  }
+  if (printOnceFlag && (millis() - previousUpdateMillis >= updateInterval))    
+  {
+      printBank();
+      printOnceFlag = false;
+  } 
+  if (currentCoinSignal != previousCoinSignal)
+  {
+      previousCoinSignal = currentCoinSignal;
+      
+      if (currentCoinSignal == HIGH)
+      {
+         bankValue = bankValue + coinValue;
+      }    
+  }
+}
